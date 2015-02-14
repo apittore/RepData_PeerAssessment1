@@ -1,25 +1,164 @@
+
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Reproducible Research - Peer Project1"
+
+date: "Saturday, February 14, 2015"
+output: html_document
 ---
 
+This is an R Markdown document Related to the peer project of Reproducible Research see <https://class.coursera.org/repdata-011> 
 
-## Loading and preprocessing the data
+The project is divided in four sections/questions :
 
-
-
-## What is mean total number of steps taken per day?
-
-
-
-## What is the average daily activity pattern?
-
+1. Loading and preprocessing the data
+2. What is mean total number of steps taken per day?
+3. What is the average daily activity pattern?
+4. Imputing missing values
+5. Are there differences in activity patterns between weekdays and weekends?
 
 
-## Imputing missing values
+###*<font color='red'>Loading and preprocessing the data</font>*
+```{r}
+library(plyr)
+library(data.table)
+library(ggplot2)
+library(lattice)
+
+
+is.integer0<-function(x){
+  
+  is.integer(x) && length(x)== 0L
+}
+
+file <- "C:/Users/Alessandro/Documents/R/reppro1/activity.csv"
+activity <- read.csv(file)
+activity$date<-as.Date(activity$date,format="%Y-%m-%d")
+```
+
+####What is mean total number of steps taken per day?
+
+For this part of the assignment, you can ignore the missing values in the dataset.
+
+Calculate the total number of steps taken per day
+```{r, echo=FALSE}
+total_steps<-aggregate(activity$steps ~ activity$date ,data=activity,sum)
+
+```
+
+####Make a histogram of the total number of steps taken each day
+
+
+```{r, echo=FALSE}
+hist(total_steps[,2],breaks=length(total_steps[,1]),main="Total Number of Steps by Date",xlab="Total Steps")
+```
+
+####Calculate and report the mean and median of the total number of steps taken per day
+```{r, echo=FALSE}
+mean_steps<-aggregate(activity$steps ~ activity$date ,data=activity,mean)
+median_steps<-aggregate(activity$steps ~ activity$date ,data=activity,median)
+names(mean_steps)[1]<-paste("date")
+names(mean_steps)[2]<-paste("mean_steps")
+names(median_steps)[1]<-paste("date")
+names(median_steps)[2]<-paste("median_steps")
+print(mean_steps)
+print(median_steps)
+```
+
+###*<font color='red'>What is the average daily activity pattern?</font>*
+
+####Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)?
+
+
+```{r, echo=FALSE}
+mean_steps_int<-aggregate(activity$steps ~ activity$interval ,data=activity,mean)
+plot(mean_steps_int,type="l",xlab="interval",ylab="mean Steps",main="Average daily Activity Pattern")
+```
+
+####Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+
+```{r, echo=FALSE}
+mean_steps_int<-aggregate(activity$steps ~ activity$interval ,data=activity,mean)
+names(mean_steps_int)[1]<-paste("interval")
+names(mean_steps_int)[2]<-paste("mean_steps")
+max_steps_interval<-last(mean_steps_int[order(mean_steps_int$mean_steps),])
+print(paste0("Interval with max number of steps: ",max_steps_interval[1]))
+
+```
+
+
+###*<font color='red'>Imputing missing values</font>*
+
+####Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+```{r, echo=FALSE}
+mean_steps_na<-by(activity$steps,activity$date,is.na)
+print(paste0("number of intervals with NA steps is: ",last(count(activity$steps))[2]))
+
+```
+
+####Devise a strategy for filling in all of the missing values in the dataset
+####Create a new dataset that is equal to the original dataset but with the missing data filled in
+
+```{r, echo=FALSE}
+new_activity<-activity
+
+for(i in 1:length(new_activity$steps)){
+  
+if(is.na(new_activity$steps[i])){
+  
+    if(is.integer0(which(activity$date[i]==mean_steps$date))){
+  
+      new_activity$steps[i]<-0
+                                                             }
+       
+    else {new_activity$steps[i]<-mean_steps$mean_steps[which(activity$date[i]==mean_steps$date)]}
+   
+                            }
+                                     }
+
+```
+
+####Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+```{r, echo=FALSE}
+
+new_mean_steps<-aggregate(new_activity$steps ~ new_activity$date ,data=new_activity,mean)
+new_median_steps<-aggregate(new_activity$steps ~ new_activity$date ,data=new_activity,median)
+new_total_steps<-aggregate(new_activity$steps ~ new_activity$date ,data=new_activity,sum)
+names(new_mean_steps)[1]<-paste("date")
+names(new_mean_steps)[2]<-paste("mean_steps")
+
+hist(new_total_steps[,2],breaks=length(new_mean_steps[,1]),main="Total Number of Steps by Date",xlab="Total Steps")
 
 
 
-## Are there differences in activity patterns between weekdays and weekends?
+```
+
+
+###*<font color='red'>Are there differences in activity patterns between weekdays and weekends?</font>*
+
+
+####Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+
+
+```{r, echo=FALSE}
+new_activity$date<-as.Date(new_activity$date,format="%Y-%m-%d")
+
+new_activity$date<-weekdays(new_activity$date)
+new_activity$weekday["weekday"]<-NA
+
+for(d in 1:length(new_activity$weekday)){
+ day<- pmatch(new_activity$date[d],c("monday","tuesday","wednesday","thursday","friday","saturday","sunday"))
+ if(day==7)  {
+   new_activity$weekday[d]<-"weekend"}
+else {new_activity$weekday[d]<-"weekday"}
+}
+
+```
+
+####Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). 
+
+```{r, echo=FALSE}
+xyplot(new_activity$step~new_activity$interval | factor(weekday), data=new_activity, pch=19, xlab="Interval",  ylab="Number of steps",layout=c(1,2),type="l")
+
+```
+
+
